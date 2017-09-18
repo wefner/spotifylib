@@ -176,14 +176,3 @@ class Token(object):
     @property
     def scope(self):
         return self._token_details.get('scope', None)
-
-
-if __name__ == '__main__':
-    import os
-    spotify = Spotify(client_id=os.environ.get('CLIENT_ID'),
-                      client_secret=os.environ.get('CLIENT_SECRET'),
-                      username=os.environ.get('USERNAME'),
-                      password=os.environ.get('PASSWORD'),
-                      callback=os.environ.get('CALLBACK_URL'),
-                      scope=os.environ.get('SCOPE'))
-    print(spotify.token.access_token)

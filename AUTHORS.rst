@@ -6,6 +6,7 @@ Development Lead
 ----------------
 
 * Oriol Fabregas <fabregas.oriol@gmail.com>
+* Costas Tyfoxylos <https://github.com/costastf>
 
 Contributors
 ------------

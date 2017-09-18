@@ -11,7 +11,7 @@ AUTHORIZE_URL = '{SITE}/authorize'.format(SITE=SITE)
 API_LOGIN_URL = '{SITE}/api/login'.format(SITE=SITE)
 LOGIN_WEB_URL = '{SITE}/en/login'.format(SITE=SITE)
 AUTHORIZE_WEB_URL = '{SITE}/en/authorize'.format(SITE=SITE)
-ACCEPT_URL = '{SITE}/en/authorize/accept'.format(SITE=SITE)
+ACCEPT_URL = '{AUTH_URL}/accept'.format(AUTH_URL=AUTHORIZE_WEB_URL)
 TOKEN_URL = '{SITE}/api/token'.format(SITE=SITE)
 
 HEADERS = {'Host': urlparse(SITE).netloc,
