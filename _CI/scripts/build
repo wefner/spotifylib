@@ -1,0 +1,26 @@
+#!/bin/bash --login
+set -e
+cd $(dirname $0)/../..
+
+. _CI/scripts/bootstrap
+
+rm -rf build dist
+
+# we want all these files to exist in the actual package
+cp .VERSION spotifylib/.VERSION
+cp LICENSE spotifylib/LICENSE
+cp AUTHORS.rst spotifylib/AUTHORS.rst
+cp CONTRIBUTING.rst spotifylib/CONTRIBUTING.rst
+cp HISTORY.rst spotifylib/HISTORY.rst
+cp README.rst spotifylib/README.rst
+cp USAGE.rst spotifylib/USAGE.rst
+
+python setup.py sdist bdist_egg
+
+rm spotifylib/.VERSION
+rm spotifylib/LICENSE
+rm spotifylib/AUTHORS.rst
+rm spotifylib/CONTRIBUTING.rst
+rm spotifylib/HISTORY.rst
+rm spotifylib/README.rst
+rm spotifylib/USAGE.rst
