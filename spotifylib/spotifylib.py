@@ -156,11 +156,6 @@ class Spotify(object):
         return response
 
     def _get_token(self, response):
-        token_keys = ['access_token',
-                      'token_type',
-                      'expires_in',
-                      'refresh_token',
-                      'scope']
         # TODO unsafe index reference. Handle better.
         code = response.json().get('redirect').split('code=')[1]
         payload = {'grant_type' : 'authorization_code',
@@ -174,7 +169,7 @@ class Spotify(object):
                                      headers=headers)
         if not response.ok:
             raise RequestException("Failed to get token")
-        values = [response.json().get(key) for key in token_keys]
+        values = [response.json().get(key) for key in Token._fields]
         if not all(values):
             raise RequestException('Incomplete token response received.')
         return Token(*values)
