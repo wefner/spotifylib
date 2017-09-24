@@ -83,6 +83,7 @@ class Spotify(object):
     @staticmethod
     def __get_bon(response_page):
         soup = Bfs(response_page, 'html.parser')
+        # TODO unsafe index reference. Handle better.
         meta = soup.find_all('meta')[-1]
         data = ast.literal_eval(meta.attrs.get('sp-bootstrap-data'))
         bon = data.get('BON')
@@ -160,6 +161,7 @@ class Spotify(object):
                       'expires_in',
                       'refresh_token',
                       'scope']
+        # TODO unsafe index reference. Handle better.
         code = response.json().get('redirect').split('code=')[1]
         payload = {'grant_type' : 'authorization_code',
                    'code': code,
