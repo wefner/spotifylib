@@ -8,10 +8,12 @@ Put your classes here
 """
 
 from requests import Session
+from requests.exceptions import RequestException
 from bs4 import BeautifulSoup as Bfs
 from urllib import quote
 from base64 import b64encode
 from constants import *
+from collections import namedtuple
 import ast
 import logging
 
@@ -34,102 +36,128 @@ class Spotify(object):
                  password,
                  callback,
                  scope):
-        self.__client_id = client_id
-        self.__client_secret = client_secret
-        self.__username = username
-        self.__password = password
-        self.__callback = callback
-        self.__scope = scope
-        self.token = None
+        self._logger = logging.getLogger('{base}.{suffix}'
+                                         .format(base=LOGGER_BASENAME,
+                                                 suffix=self.__class__.__name__)
+                                         )
+        self._client_id = client_id
+        self._client_secret = client_secret
+        self._username = username
+        self._password = password
+        self._callback = callback
+        self._scope = scope
         self.session = Session()
-        self.__referer = '{AUTH_URL}?scope={SCOPE}&' \
-                         'redirect_uri={CALLBACK}?' \
-                         'response_type=code?' \
-                         'client_id={CLIENT_ID}'.format(
-                                                AUTH_URL=AUTHORIZE_WEB_URL,
-                                                SCOPE=quote(self.__scope),
-                                                CALLBACK=quote(self.__callback,
-                                                               safe=':'),
-                                                CLIENT_ID=self.__client_id)
-        HEADERS.update({
-            'Referer': '{LOGIN_URL}?'
-                        'continue={REFERER_PARAMS}'.format(LOGIN_URL=LOGIN_WEB_URL,
-                                                           REFERER_PARAMS=quote(self.__referer,
-                                                                                safe=':'))})
-        self.__request_app_authorization()
-        self.connect_app_to_spotify_account()
+        HEADERS.update({'Referer': self._get_referer()})
+        self.__authenticate()
 
-    def __request_app_authorization(self):
-        result = False
-        params = {'scope': self.__scope,
-                  'redirect_uri': self.__callback,
+    def __authenticate(self):
+        self.request_app_authorization()
+        self.login_to_account()
+        self.get_authorization()
+        response = self.accept_app_to_account()
+        if not response.ok:
+            raise RequestException("Couldn't get code to request token")
+        token = self.get_token(response)
+        if not token.ok:
+            raise RequestException("Error while getting token")
+        self.token = self.convert_token_named_tuple(token.json())
+        return True
+
+    def _get_referer(self):
+        referer_params = ('{auth}?scope={scope}&'.format(auth=AUTH_WEB_URL,
+                                                         scope=quote(self._scope)),
+                          'redirect_uri={call}?'.format(call=quote(self._callback,
+                                                                   safe=':')),
+                          'response_type=code?',
+                          'client_id={client_id}'.format(client_id=self._client_id))
+        referer_header = ('{login_url}?'.format(login_url=LOGIN_WEB_URL),
+                          'continue={params}'.format(params=quote(''.join(referer_params),
+                                                                  safe=':')))
+        return ''.join(referer_header)
+
+    def request_app_authorization(self):
+        params = {'scope': self._scope,
+                  'redirect_uri': self._callback,
                   'response_type': 'code',
-                  'client_id': self.__client_id}
-        response = self.session.get(AUTHORIZE_WEB_URL, params=params)
-        bon = self.__get_bon(response.text)
-        bon_cookie = self.__calculate_bon(bon)
-        if self.__validate_bon(bon[2], bon_cookie):
-            __bon_cookie = {'name': '__bon',
-                            'value': bon_cookie}
-            self.session.cookies.set(**__bon_cookie)
-            result = True
-        return result
+                  'client_id': self._client_id}
+        response = self.session.get(AUTH_WEB_URL, params=params)
+        if not response.ok:
+            raise RequestException("Failed to get authorization page")
+        __bon_cookie = {'name': '__bon',
+                        'value': self.__get_bon(response.text)}
+        self.session.cookies.set(**__bon_cookie)
+        return True
 
-    def connect_app_to_spotify_account(self):
+    def login_to_account(self):
+        fb_value = ('{auth}?scope={scope}&'.format(auth=AUTH_WEB_URL,
+                                                   scope=quote(self._scope,
+                                                               safe=':')),
+                    'redirect_uri={call}&'.format(call=quote(self._callback,
+                                                             safe=':')),
+                    'response_type=code&',
+                    'client_id={client_id}'.format(client_id=self._client_id))
         __fb_cookie = {'name': 'fb_continue',
-                       'value': '{AUTH_URL}?scope={SCOPE}&'
-                                'redirect_uri={CALLBACK}&'
-                                'response_type=code&'
-                                'client_id={CLIENT_ID}'.format(AUTH_URL=AUTHORIZE_WEB_URL,
-                                                               SCOPE=quote(self.__scope, safe=':'),
-                                                               CALLBACK=quote(self.__callback, safe=':'),
-                                                               CLIENT_ID=self.__client_id)}
+                       'value': ''.join(fb_value)}
         self.session.cookies.set(**__fb_cookie)
         payload = {'remember': 'true',
-                   'username': self.__username,
-                   'password': self.__password,
+                   'username': self._username,
+                   'password': self._password,
                    'csrf_token': self.session.cookies.get('csrf_token')}
         response = self.session.post(API_LOGIN_URL,
                                      data=payload,
                                      headers=HEADERS)
-        if response.ok:
-            return self.get_authorization()
+        if not response.ok:
+            raise RequestException("Failed to login to API")
+        return True
 
     def get_authorization(self):
-        params = {'scope': self.__scope,
-                  'redirect_uri': self.__callback,
+        params = {'scope': self._scope,
+                  'redirect_uri': self._callback,
                   'response_type': 'code',
-                  'client_id': self.__client_id}
-        response = self.session.get(AUTHORIZE_WEB_URL,
+                  'client_id': self._client_id}
+        response = self.session.get(AUTH_WEB_URL,
                                     headers=HEADERS,
                                     params=params)
-        if response.ok:
-            return self.accept_app_to_spotify_account()
+        if not response.ok:
+            raise RequestException("Failed to authorize APP")
+        return True
 
-    def accept_app_to_spotify_account(self):
-        payload = {'scope': self.__scope,
-                   'redirect_uri': self.__callback,
+    def accept_app_to_account(self):
+        payload = {'scope': self._scope,
+                   'redirect_uri': self._callback,
                    'response_type': 'code',
-                   'client_id': self.__client_id,
+                   'client_id': self._client_id,
                    'csrf_token': self.session.cookies.get('csrf_token')}
         response = self.session.post(ACCEPT_URL,
                                      data=payload,
                                      headers=HEADERS)
-        return self.authenticate(response)
+        if not response.ok:
+            raise RequestException("Failed to accept APP to account")
+        return response
 
-    def authenticate(self, response):
+    def get_token(self, response):
         code = response.json().get('redirect').split('code=')[1]
         payload = {'grant_type' : 'authorization_code',
                    'code': code,
-                   'redirect_uri': self.__callback}
-        base64encoded = b64encode("{}:{}".format(self.__client_id,
-                                                 self.__client_secret))
+                   'redirect_uri': self._callback}
+        base64encoded = b64encode("{}:{}".format(self._client_id,
+                                                 self._client_secret))
         headers = {"Authorization": "Basic {}".format(base64encoded)}
         response = self.session.post(TOKEN_URL,
                                      data=payload,
                                      headers=headers)
-        self.token = Token(response.json())
+        if not response.ok:
+            raise RequestException("Failed to get_token and get token")
         return response
+
+    @staticmethod
+    def convert_token_named_tuple(token_details):
+        token_ = {'access_token': token_details.get('access_token', None),
+                  'token_type': token_details.get('token_type', None),
+                  'expires_in': token_details.get('expires_in', None),
+                  'refresh_token': token_details.get('refresh_token', None),
+                  'scope': token_details.get('scope', None)}
+        return namedtuple('TokenDetails', token_.keys())(**token_)
 
     @staticmethod
     def __get_bon(response_page):
@@ -137,42 +165,10 @@ class Spotify(object):
         meta = soup.find_all('meta')[-1]
         data = ast.literal_eval(meta.attrs.get('sp-bootstrap-data'))
         bon = data.get('BON')
-        return bon
-
-    @staticmethod
-    def __calculate_bon(bon):
+        if not bon:
+            raise ValueError("Bon not found", "Meta: {meta} \n"
+                                              "Data: {data}".format(meta=meta,
+                                                                    data=data))
         bon.extend([bon[-1] * 42, 1, 1, 1, 1])
         __bon = b64encode('|'.join([str(entry) for entry in bon]))
         return __bon
-
-    @staticmethod
-    def __validate_bon(bon, cookie_bon):
-        result = False
-        if bon == int(cookie_bon.decode('base64').split('|')[2]):
-            result = True
-        return result
-
-
-class Token(object):
-    def __init__(self, token_details):
-        self._token_details = token_details
-
-    @property
-    def access_token(self):
-        return self._token_details.get('access_token', None)
-
-    @property
-    def token_type(self):
-        return self._token_details.get('token_type', None)
-
-    @property
-    def expires_in(self):
-        return self._token_details.get('expires_in', None)
-
-    @property
-    def refresh_token(self):
-        return self._token_details.get('refresh_token', None)
-
-    @property
-    def scope(self):
-        return self._token_details.get('scope', None)
