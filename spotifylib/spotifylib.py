@@ -177,4 +177,4 @@ class Spotify(object):
         values = [response.json().get(key) for key in token_keys]
         if not all(values):
             raise RequestException('Incomplete token response received.')
-        return Token(values)
+        return Token(*values)
