@@ -173,21 +173,9 @@ class SpotifyAuthenticator(object):
         payload = {'grant_type': 'authorization_code',
                    'code': code,
                    'redirect_uri': self._callback}
-        base64encoded = b64encode("{}:{}".format(self.user.client_id,
-                                                 self.user.client_secret))
-        headers = {'Authorization': 'Basic {}'.format(base64encoded)}
-        response = self.session.post(TOKEN_URL,
-                                     data=payload,
-                                     headers=headers)
-        if not response.ok:
-            raise RequestException("Failed to get token")
-        values = [response.json().get(key) for key in Token._fields]
-        if not all(values):
-            raise RequestException('Incomplete token response received.')
-        return Token(*values)
+        return self._retrieve_token(self.session, self.user, payload)
 
-    @staticmethod
-    def _renew_token(session, user, token):
+    def _renew_token(self):
         """
         >>> response.json()
         {u'error': {u'status': 401, u'message': u'The access token expired'}}
@@ -196,7 +184,11 @@ class SpotifyAuthenticator(object):
         :return:
         """
         payload = {'grant_type': 'refresh_token',
-                   'refresh_token': token.refresh_token}
+                   'refresh_token': self.token.refresh_token}
+        return self._retrieve_token(self.session, self.user, payload)
+
+    @staticmethod
+    def _retrieve_token(session, user, payload):
         base64encoded = b64encode('{}:{}'.format(user.client_id,
                                                  user.client_secret))
         headers = {'Authorization': 'Basic {}'.format(base64encoded)}
@@ -210,6 +202,7 @@ class SpotifyAuthenticator(object):
         if not all(values):
             raise RequestException('Incomplete token response received.')
         return Token(*values)
+
 
     def _monkey_patch_session(self):
         self.session._original_get = self.session.get
