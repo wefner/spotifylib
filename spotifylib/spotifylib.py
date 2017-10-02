@@ -201,12 +201,13 @@ class SpotifyAuthenticator(object):
                                 headers=headers)
         if not response.ok:
             raise RequestException("Couldn't get new token from refresh token")
-        Token = namedtuple('Token', ['access_token',
-                                     'token_type',
-                                     'expires_in',
-                                     'refresh_token',
-                                     'scope'])
-        return token
+
+        values = [response.json().get(key) for key in Token._fields]
+        if not all(values):
+            raise RequestException('Incomplete token response received.')
+        return Token(*values)
+        # token = Token([values for values in response.json().get(Token._fields)])
+        # return token
 
     def _monkey_patch_session(self):
         self.session._original_get = self.session.get
@@ -215,6 +216,7 @@ class SpotifyAuthenticator(object):
         self.session.get = self._patched_get
 
     def _patched_get(self, *args, **kwargs):
+        print('patched_get!fndsafsd###nfdsigndsiongsdangiungaiugndfignadfiuhiuahad')
         response = self.session._original_get(*args, **kwargs)
         if response.status_code == 401 \
             and response.json().get('message') == 'The access token expired':
