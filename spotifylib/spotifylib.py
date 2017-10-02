@@ -165,7 +165,11 @@ class SpotifyAuthenticator(object):
 
     def _get_token(self, response):
         # TODO unsafe index reference. Handle better.
-        code = response.json().get('redirect').split('code=')[1]
+        try:
+            code = response.json().get('redirect', '').split('code=')[1]
+        except (AttributeError, IndexError):
+            self._logger.exception(response.content)
+            raise
         payload = {'grant_type': 'authorization_code',
                    'code': code,
                    'redirect_uri': self._callback}
@@ -206,8 +210,6 @@ class SpotifyAuthenticator(object):
         if not all(values):
             raise RequestException('Incomplete token response received.')
         return Token(*values)
-        # token = Token([values for values in response.json().get(Token._fields)])
-        # return token
 
     def _monkey_patch_session(self):
         self.session._original_get = self.session.get
@@ -216,7 +218,7 @@ class SpotifyAuthenticator(object):
         self.session.get = self._patched_get
 
     def _patched_get(self, *args, **kwargs):
-        print('patched_get!fndsafsd###nfdsigndsiongsdangiungaiugndfignadfiuhiuahad')
+        print('patched_get!###################################################')
         response = self.session._original_get(*args, **kwargs)
         if response.status_code == 401 \
             and response.json().get('message') == 'The access token expired':
