@@ -175,7 +175,8 @@ class SpotifyAuthenticator(object):
                    'redirect_uri': self._callback}
         return self._retrieve_token(self.session, self.user, payload)
 
-    def _renew_token(self):
+    @staticmethod
+    def _renew_token(session, user, token):
         """
         >>> response.json()
         {u'error': {u'status': 401, u'message': u'The access token expired'}}
@@ -184,8 +185,8 @@ class SpotifyAuthenticator(object):
         :return:
         """
         payload = {'grant_type': 'refresh_token',
-                   'refresh_token': self.token.refresh_token}
-        return self._retrieve_token(self.session, self.user, payload)
+                   'refresh_token': token.refresh_token}
+        return SpotifyAuthenticator._retrieve_token(session, user, payload)
 
     @staticmethod
     def _retrieve_token(session, user, payload):
@@ -201,6 +202,8 @@ class SpotifyAuthenticator(object):
         values = [response.json().get(key) for key in Token._fields]
         if not values[3]:
             # in case of refresh we don't get the refresh token back so we will just inject it
+            # of course we should already have it since this is a refresh request so session should already be set up
+            # maybe this can be a little simpler, hm....
             values[3] = session.token.refresh_token
         if not all(values):
             raise RequestException('Incomplete token response received.')
@@ -210,6 +213,7 @@ class SpotifyAuthenticator(object):
         self.session._original_request = self.session.request
         self.session.token = self.token
         self.session.user = self.user
+        self.session.renew_token = self._renew_token
         self.session.request = self._patched_request
 
     def _patched_request(self, method, url, **kwargs):
@@ -220,9 +224,11 @@ class SpotifyAuthenticator(object):
         response = self.session._original_request(method, url, **kwargs)
         self._logger.debug('Got response content {}'.format(response.content))
         if response.status_code == 401 \
-            and response.json().get('message') == 'The access token expired'
+            and response.json().get('message') == 'The access token expired':
             self._logger.warning('Expired token detected, trying to refresh!')
-            self.session.token = self._renew_token()
+            self.session.token = self.session._renew_token(self.session,
+                                                           self.user,
+                                                           self.token)
             self._logger.debug('Trying again initial request')
             response = self.session._original_request(method, url, **kwargs)
             self._logger.debug(('Got response content '
