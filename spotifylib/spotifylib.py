@@ -199,6 +199,9 @@ class SpotifyAuthenticator(object):
             raise RequestException("Couldn't get new token from refresh token")
 
         values = [response.json().get(key) for key in Token._fields]
+        if not values[3]:
+            # in case of refresh we don't get the refresh token back so we will just inject it
+            values[3] = session.token.refresh_token
         if not all(values):
             raise RequestException('Incomplete token response received.')
         return Token(*values)
@@ -210,13 +213,20 @@ class SpotifyAuthenticator(object):
         self.session.request = self._patched_request
 
     def _patched_request(self, method, url, **kwargs):
-        print('patched_request!###############################################')
+        self._logger.debug(('Using patched request for method {method}, url '
+                            '{url} with kwargs {kwargs}').format(method=method,
+                                                                 url=url,
+                                                                 kwargs=kwargs))
         response = self.session._original_request(method, url, **kwargs)
-        print(response.content)
+        self._logger.debug('Got response content {}'.format(response.content))
         if response.status_code == 401 \
-            and response.json().get('message') == 'The access token expired':
+            and response.json().get('message') == 'The access token expired'
+            self._logger.warning('Expired token detected, trying to refresh!')
             self.session.token = self._renew_token()
+            self._logger.debug('Trying again initial request')
             response = self.session._original_request(method, url, **kwargs)
+            self._logger.debug(('Got response content '
+                                '{}').format(response.content))
         return response
 
 
@@ -234,6 +244,6 @@ class Spotify(object):
                                              password,
                                              callback,
                                              scope)
-        spotify = SpotifyToPatch(auth=authenticated.token,
+        spotify = SpotifyToPatch(auth=authenticated.token.access_token,
                                  requests_session=authenticated.session)
         return spotify
