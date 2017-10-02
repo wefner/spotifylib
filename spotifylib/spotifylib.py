@@ -204,18 +204,19 @@ class SpotifyAuthenticator(object):
         return Token(*values)
 
     def _monkey_patch_session(self):
-        self.session._original_get = self.session.get
+        self.session._original_request = self.session.request
         self.session.token = self.token
         self.session.user = self.user
-        self.session.get = self._patched_get
+        self.session.request = self._patched_request
 
-    def _patched_get(self, *args, **kwargs):
-        print('patched_get!###################################################')
-        response = self.session._original_get(*args, **kwargs)
+    def _patched_request(self, method, url, **kwargs):
+        print('patched_request!###############################################')
+        response = self.session._original_request(method, url, **kwargs)
+        print(response.content)
         if response.status_code == 401 \
             and response.json().get('message') == 'The access token expired':
             self.session.token = self._renew_token()
-            response = self.session._original_get(*args, **kwargs)
+            response = self.session._original_request(method, url, **kwargs)
         return response
 
 
