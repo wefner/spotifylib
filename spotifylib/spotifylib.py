@@ -158,7 +158,7 @@ class Spotify(object):
     def _get_token(self, response):
         # TODO unsafe index reference. Handle better.
         code = response.json().get('redirect').split('code=')[1]
-        payload = {'grant_type' : 'authorization_code',
+        payload = {'grant_type': 'authorization_code',
                    'code': code,
                    'redirect_uri': self._callback}
         base64encoded = b64encode("{}:{}".format(self._client_id,
@@ -173,3 +173,23 @@ class Spotify(object):
         if not all(values):
             raise RequestException('Incomplete token response received.')
         return Token(*values)
+
+    def renew_token(self, refresh_token):
+        """
+        >>> response.json()
+        {u'error': {u'status': 401, u'message': u'The access token expired'}}
+
+        :param refresh_token:
+        :return:
+        """
+        payload = {'grant_type': 'refresh_token',
+                   'refresh_token': refresh_token}
+        base64encoded = b64encode('{}:{}'.format(self._client_id,
+                                                 self._client_secret))
+        headers = {'Authorization': 'Basic {}'.format(base64encoded)}
+        response = self.session.post(TOKEN_URL,
+                                     data=payload,
+                                     headers=headers)
+        if not response.ok:
+            raise RequestException("Couldn't get new token from refresh token")
+        return response
