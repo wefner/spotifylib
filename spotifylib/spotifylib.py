@@ -8,16 +8,13 @@ Put your classes here
 """
 
 from requests import Session
-from requests.exceptions import RequestException
-from bs4 import BeautifulSoup as Bfs
 from urllib import quote
 from base64 import b64encode
 from constants import *
 from collections import namedtuple
 from spotipy import Spotify as SpotifyToPatch
-from spotifylibexceptions import ErrorAcceptingApp
+from spotifylibexceptions import SpotifyError
 
-import ast
 import logging
 
 
@@ -68,12 +65,9 @@ class SpotifyAuthenticator(object):
         return self._token
 
     def __authenticate(self):
-        self._request_app_authorization()
-        self._login_to_account()
         self._get_authorization()
+        self._login_to_account()
         response = self._accept_app_to_account()
-        if not response.ok:
-            raise RequestException("Couldn't get code to request token")
         self._token = self._get_token(response)
         self._monkey_patch_session()
         return True
@@ -92,31 +86,15 @@ class SpotifyAuthenticator(object):
 
     @staticmethod
     def __get_bon(response_page):
-        soup = Bfs(response_page, 'html.parser')
-        # TODO unsafe index reference. Handle better.
-        meta = soup.find_all('meta')[-1]
-        data = ast.literal_eval(meta.attrs.get('sp-bootstrap-data'))
-        bon = data.get('BON')
+        try:
+            bon = response_page.json().get('BON', [])
+        except ValueError:
+            raise SpotifyError("Response page couldn't be decoded")
         if not bon:
-            raise ValueError("Bon not found", "Meta: {meta} \n"
-                                              "Data: {data}".format(meta=meta,
-                                                                    data=data))
+            raise ValueError("Bon not found. Got {}".format(response_page.content))
         bon.extend([bon[-1] * 42, 1, 1, 1, 1])
         __bon = b64encode('|'.join([str(entry) for entry in bon]))
         return __bon
-
-    def _request_app_authorization(self):
-        params = {'scope': self._scope,
-                  'redirect_uri': self._callback,
-                  'response_type': 'code',
-                  'client_id': self.user.client_id}
-        response = self.session.get(AUTH_WEB_URL, params=params)
-        if not response.ok:
-            raise RequestException("Failed to get authorization page")
-        __bon_cookie = {'name': '__bon',
-                        'value': self.__get_bon(response.text)}
-        self.session.cookies.set(**__bon_cookie)
-        return True
 
     def _login_to_account(self):
         payload = {'remember': 'true',
@@ -126,8 +104,10 @@ class SpotifyAuthenticator(object):
         response = self.session.post(API_LOGIN_URL,
                                      data=payload,
                                      headers=HEADERS)
-        if not response.ok:
-            raise RequestException("Failed to login to API")
+        if response.status_code == 400:
+            self._logger.exception(response.content)
+            raise SpotifyError("Failed to login to API. "
+                               "Message: {}".format(response.content))
         return True
 
     def _get_authorization(self):
@@ -139,7 +119,12 @@ class SpotifyAuthenticator(object):
                                     headers=HEADERS,
                                     params=params)
         if not response.ok:
-            raise RequestException("Failed to authorize APP")
+            self._logger.exception(response.content)
+            raise SpotifyError("Failed to get authorization page. "
+                               "Message: {}".format(response.content))
+        __bon_cookie = {'name': '__bon',
+                        'value': self.__get_bon(response)}
+        self.session.cookies.set(**__bon_cookie)
         return True
 
     def _accept_app_to_account(self):
@@ -152,16 +137,17 @@ class SpotifyAuthenticator(object):
                                      data=payload,
                                      headers=HEADERS)
         if response.status_code == 400:
-            raise ErrorAcceptingApp(response.content)
+            self._logger.exception(response.content)
+            raise SpotifyError(response.content)
         return response
 
     def _get_token(self, response):
-        # TODO unsafe index reference. Handle better.
         try:
             code = response.json().get('redirect', '').split('code=')[1]
         except (AttributeError, IndexError):
             self._logger.exception(response.content)
-            raise
+            raise SpotifyError("Error while getting the token. "
+                               "Got: {}".format(response.content))
         payload = {'grant_type': 'authorization_code',
                    'code': code,
                    'redirect_uri': self._callback}
@@ -188,17 +174,21 @@ class SpotifyAuthenticator(object):
         response = session.post(TOKEN_URL,
                                 data=payload,
                                 headers=headers)
-        if not response.ok:
-            raise RequestException("Couldn't get new token from refresh token")
+        if response.status_code == 400:
+            LOGGER.exception(response.content)
+            raise SpotifyError("Couldn't get new token from refresh token. "
+                               "Got: {}".format(response.content))
 
         values = [response.json().get(key) for key in Token._fields]
         if not values[3]:
-            # in case of refresh we don't get the refresh token back so we will just inject it
+            # in case of refresh, we don't get the refresh token back so we will just inject it
             # of course we should already have it since this is a refresh request so session should already be set up
             # maybe this can be a little simpler, hm....
             values[3] = session.token.refresh_token
         if not all(values):
-            raise RequestException('Incomplete token response received.')
+            LOGGER.exception(response.content)
+            raise ValueError('Incomplete token response received. '
+                             'Got: {}'.format(response.json()))
         return Token(*values)
 
     def _monkey_patch_session(self):

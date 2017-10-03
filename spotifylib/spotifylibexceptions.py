@@ -13,7 +13,7 @@ __docformat__ = 'plaintext'
 __date__ = '''18-09-2017'''
 
 
-class ErrorAcceptingApp(Exception):
+class SpotifyError(Exception):
     """
     # Wrong client_id
     (<Response [400]>, 'INVALID_CLIENT: Invalid client')
@@ -29,10 +29,6 @@ class ErrorAcceptingApp(Exception):
 
     # Invalid redirect_uri
     (<Response [400]>, 'Illegal redirect_uri')
+    "Error while accepting APP to Spotify API"
     """
-    def __init__(self, message):
-        self._message = message
-
-    def __str__(self):
-        return "Error while accepting APP to Spotify API. " \
-               "Message: {}".format(self._message)
+    pass
