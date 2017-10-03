@@ -11,3 +11,28 @@ Put your exception classes here
 __author__ = '''Oriol Fabregas <fabregas.oriol@gmail.com>'''
 __docformat__ = 'plaintext'
 __date__ = '''18-09-2017'''
+
+
+class ErrorAcceptingApp(Exception):
+    """
+    # Wrong client_id
+    (<Response [400]>, 'INVALID_CLIENT: Invalid client')
+
+    # Wrong response_type
+    (<Response [400]>, 'response_type must be code or token')
+
+    # Invalid scope
+    (<Response [400]>, 'INVALID_SCOPE: Invalid scope')
+
+    # Invalid CSRF cookie
+    (<Response [400]>, '{"error":"errorCSRF"}')
+
+    # Invalid redirect_uri
+    (<Response [400]>, 'Illegal redirect_uri')
+    """
+    def __init__(self, message):
+        self._message = message
+
+    def __str__(self):
+        return "Error while accepting APP to Spotify API. " \
+               "Message: {}".format(self._message)

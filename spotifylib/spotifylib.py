@@ -14,9 +14,11 @@ from urllib import quote
 from base64 import b64encode
 from constants import *
 from collections import namedtuple
+from spotipy import Spotify as SpotifyToPatch
+from spotifylibexceptions import ErrorAcceptingApp
+
 import ast
 import logging
-from spotipy import Spotify as SpotifyToPatch
 
 
 __author__ = '''Oriol Fabregas <fabregas.oriol@gmail.com>'''
@@ -117,16 +119,6 @@ class SpotifyAuthenticator(object):
         return True
 
     def _login_to_account(self):
-        fb_value = ('{auth}?scope={scope}&'.format(auth=AUTH_WEB_URL,
-                                                   scope=quote(self._scope,
-                                                               safe=':')),
-                    'redirect_uri={call}&'.format(call=quote(self._callback,
-                                                             safe=':')),
-                    'response_type=code&',
-                    'client_id={cl_id}'.format(cl_id=self.user.client_id))
-        __fb_cookie = {'name': 'fb_continue',
-                       'value': ''.join(fb_value)}
-        self.session.cookies.set(**__fb_cookie)
         payload = {'remember': 'true',
                    'username': self.user.username,
                    'password': self.user.password,
@@ -159,8 +151,8 @@ class SpotifyAuthenticator(object):
         response = self.session.post(ACCEPT_URL,
                                      data=payload,
                                      headers=HEADERS)
-        if not response.ok:
-            raise RequestException("Failed to accept APP to account")
+        if response.status_code == 400:
+            raise ErrorAcceptingApp(response.content)
         return response
 
     def _get_token(self, response):
@@ -224,7 +216,7 @@ class SpotifyAuthenticator(object):
         response = self.session._original_request(method, url, **kwargs)
         self._logger.debug('Got response content {}'.format(response.content))
         if response.status_code == 401 \
-            and response.json().get('error'
+            and response.json().get('error', {}
                                     ).get('message'
                                           ) == 'The access token expired':
             self._logger.warning('Expired token detected, trying to refresh!')

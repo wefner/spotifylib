@@ -7,6 +7,7 @@ Imports all parts from spotifylib here
 from ._version import __version__
 from .constants import *
 from spotifylib import Spotify
+from spotifylibexceptions import ErrorAcceptingApp
 
 __author__ = '''Oriol Fabregas'''
 __email__ = '''fabregas.oriol@gmail.com'''
@@ -17,3 +18,4 @@ assert __version__
 
 # assert objects
 assert Spotify
+assert ErrorAcceptingApp
