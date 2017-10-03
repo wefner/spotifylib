@@ -224,7 +224,9 @@ class SpotifyAuthenticator(object):
         response = self.session._original_request(method, url, **kwargs)
         self._logger.debug('Got response content {}'.format(response.content))
         if response.status_code == 401 \
-            and response.json().get('message') == 'The access token expired':
+            and response.json().get('error'
+                                    ).get('message'
+                                          ) == 'The access token expired':
             self._logger.warning('Expired token detected, trying to refresh!')
             self.session.token = self.session._renew_token(self.session,
                                                            self.user,
