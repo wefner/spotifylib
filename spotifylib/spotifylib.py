@@ -7,7 +7,6 @@ Main module file
 Put your classes here
 """
 
-import inspect
 from requests import Session
 from urllib import quote
 from base64 import b64encode
