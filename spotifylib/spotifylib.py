@@ -7,12 +7,13 @@ Main module file
 Put your classes here
 """
 
+import inspect
 from requests import Session
 from urllib import quote
 from base64 import b64encode
 from constants import *
 from collections import namedtuple
-from spotipy import Spotify as SpotifyToPatch
+from spotipy import Spotify as OriginalSpotify
 from spotifylibexceptions import SpotifyError
 
 import logging
@@ -85,13 +86,13 @@ class SpotifyAuthenticator(object):
         return ''.join(referer)
 
     @staticmethod
-    def __get_bon(response_page):
+    def __get_bon(response):
         try:
-            bon = response_page.json().get('BON', [])
+            bon = response.json().get('BON', [])
         except ValueError:
             raise SpotifyError("Response page couldn't be decoded")
         if not bon:
-            raise ValueError("Bon not found. Got {}".format(response_page.content))
+            raise ValueError("Bon not found. Got {}".format(response.content))
         bon.extend([bon[-1] * 42, 1, 1, 1, 1])
         __bon = b64encode('|'.join([str(entry) for entry in bon]))
         return __bon
@@ -181,9 +182,10 @@ class SpotifyAuthenticator(object):
 
         values = [response.json().get(key) for key in Token._fields]
         if not values[3]:
-            # in case of refresh, we don't get the refresh token back so we will just inject it
-            # of course we should already have it since this is a refresh request so session should already be set up
-            # maybe this can be a little simpler, hm....
+            # in case of refresh, we don't get the refresh token back so we will
+            # just inject it. Of course we should already have it since this is
+            # a refresh request so session should already be set up maybe this
+            # can be a little simpler, hm....
             values[3] = session.token.refresh_token
         if not all(values):
             LOGGER.exception(response.content)
@@ -192,31 +194,34 @@ class SpotifyAuthenticator(object):
         return Token(*values)
 
     def _monkey_patch_session(self):
-        self.session._original_request = self.session.request
+        self.session.original_request = self.session.request
         self.session.token = self.token
         self.session.user = self.user
         self.session.renew_token = self._renew_token
         self.session.request = self._patched_request
 
     def _patched_request(self, method, url, **kwargs):
-        self._logger.debug(('Using patched request for method {method}, url '
-                            '{url} with kwargs {kwargs}').format(method=method,
-                                                                 url=url,
-                                                                 kwargs=kwargs))
-        response = self.session._original_request(method, url, **kwargs)
-        self._logger.debug('Got response content {}'.format(response.content))
+        self._logger.debug(('Using patched request for method {method}, '
+                            'url {url}').format(method=method, url=url))
+        response = self.session.original_request(method, url, **kwargs)
+        # TODO move the expired token json into constants.py and check for
+        # equality so it is easier to update.
+        # Something like:
+        # if response.status_code == 401 and response.json() == EXPIREDTOKENJSON
         if response.status_code == 401 \
             and response.json().get('error', {}
                                     ).get('message'
                                           ) == 'The access token expired':
             self._logger.warning('Expired token detected, trying to refresh!')
-            self.session.token = self.session._renew_token(self.session,
-                                                           self.user,
-                                                           self.token)
-            self._logger.debug('Trying again initial request')
-            response = self.session._original_request(method, url, **kwargs)
-            self._logger.debug(('Got response content '
-                                '{}').format(response.content))
+            self.session.token = self.session.renew_token(self.session,
+                                                          self.user,
+                                                          self.token)
+            token = self.session.token.access_token
+            self.session.parent._auth = token
+            kwargs['headers'].update({'Authorization': 'Bearer {}'.format(token)
+                                      })
+            self._logger.debug('Updated headers, trying again initial request')
+            response = self.session.original_request(method, url, **kwargs)
         return response
 
 
@@ -234,6 +239,7 @@ class Spotify(object):
                                              password,
                                              callback,
                                              scope)
-        spotify = SpotifyToPatch(auth=authenticated.token.access_token,
-                                 requests_session=authenticated.session)
+        spotify = OriginalSpotify(auth=authenticated.token.access_token,
+                                  requests_session=authenticated.session)
+        spotify._session.parent = spotify
         return spotify
