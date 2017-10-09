@@ -9,15 +9,16 @@ without the user needing to create a third party application to authorize the
 application, redirect it to the callback and then manually authorize it with
 username and password.
 
-The user will only need to create an application under his/her `developer site <https://developer.spotify.com/my-applications/#!/applications>`_
-and get `Client ID`, `Client Secret` and provide a `Redirect URI` - `http://127.0.0.1/callback` would just work.
+This library goal is to make authorization transparent but using `Spotipy's <http://spotipy.readthedocs.io/en/latest/>`_
+functionality. It is implemented in a non-standard way that Spotify wouldn't
+recommend so we can't guarantee this would work forever.
 
-Up until this point, the user will need to provide a `scope` to get a token that
-has access to the resources. Read more about scopes `here <https://developer.spotify.com/web-api/using-scopes/>`_
-
-Read more on `USAGE.rst`
+Read more on `USAGE.rst <https://github.com/wefner/spotifylib/blob/master/USAGE.rst>`_
+or `Read the docs <http://spotifylib.readthedocs.io/en/latest/>`_
+or check the code for substantial docstrings.
 
 Features
 --------
 
-* TODO
+* Same features as Spotipy's library but with transparent authentication
+* Renew's the token transparently

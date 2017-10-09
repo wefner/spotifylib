@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 Welcome to spotifylib's documentation!
-========================================================
+======================================
 
 Contents:
 
@@ -24,5 +24,8 @@ Indices and tables
 
 * :ref:`genindex`
 * :ref:`modindex`
+* :ref:`search`
+
+
 * :ref:`search`
 
