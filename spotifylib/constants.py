@@ -18,3 +18,6 @@ HEADERS = {'Host': urlparse(SITE).netloc,
            'Accept': 'application/json, text/plain, */*',
            'Content-Type': 'application/x-www-form-urlencoded'}
 
+INVALID_TOKEN_MSG = {'error':
+                         {'status': 401, 'message': 'The access token expired'}}
+

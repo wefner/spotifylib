@@ -90,6 +90,7 @@ class SpotifyAuthenticator(object):
 
         Instead of using one string and formatting all arguments, it creates
         2 tuples and joins them accordingly.
+
         :return: string
         """
         params = ('{auth}?scope={scope}&'.format(auth=AUTH_WEB_URL,
@@ -172,7 +173,7 @@ class SpotifyAuthenticator(object):
         "|" and it finally encodes it in base64.
 
         Example:
-        -------
+        --------
             - {u'country': u'NL',
                u'client': {u'name': u'fooapp'},
                u'BON': [u'0', u'0', -33232342],
@@ -313,19 +314,18 @@ class SpotifyAuthenticator(object):
             LOGGER.exception(response.content)
             raise SpotifyError("Couldn't get new token from refresh token. "
                                "Got: {}".format(response.content))
-
-        values = [response.json().get(key) for key in Token._fields]
-        if not values[3]:
-            # in case of refresh, we don't get the refresh token back so we will
-            # just inject it. Of course we should already have it since this is
-            # a refresh request so session should already be set up maybe this
-            # can be a little simpler, hm....
-            values[3] = session.token.refresh_token
-        if not all(values):
+        tokens = response.json()
+        # When requesting a new token from a refresh token, we do not get a
+        # new refresh token back so this will update the response with the
+        # already known refresh token so that Token namedtuple can be populated.
+        if not tokens.get('refresh_token'):
+            tokens.update({'refresh_token': session.token.refresh_token})
+        token_values = [tokens.get(key) for key in Token._fields]
+        if not all(token_values):
             LOGGER.exception(response.content)
             raise ValueError('Incomplete token response received. '
                              'Got: {}'.format(response.json()))
-        return Token(*values)
+        return Token(*token_values)
 
     def _monkey_patch_session(self):
         """
@@ -363,14 +363,7 @@ class SpotifyAuthenticator(object):
         self._logger.debug(('Using patched request for method {method}, '
                             'url {url}').format(method=method, url=url))
         response = self.session.original_request(method, url, **kwargs)
-        # TODO move the expired token json into constants.py and check for
-        # equality so it is easier to update.
-        # Something like:
-        # if response.status_code == 401 and response.json() == EXPIREDTOKENJSON
-        if response.status_code == 401 \
-            and response.json().get('error', {}
-                                    ).get('message'
-                                          ) == 'The access token expired':
+        if response.status_code == 401 and response.json() == INVALID_TOKEN_MSG:
             self._logger.warning('Expired token detected, trying to refresh!')
             self.session.token = self.session.renew_token(self.session,
                                                           self.user,

@@ -1,6 +1,6 @@
-============================
-spotifylib
-============================
+============
+Introduction
+============
 
 Spotify API Client
 
@@ -17,8 +17,20 @@ Read more on `USAGE.rst <https://github.com/wefner/spotifylib/blob/master/USAGE.
 or `Read the docs <http://spotifylib.readthedocs.io/en/latest/>`_
 or check the code for substantial docstrings.
 
+
+How does the library work
+-------------------------
+
+.. image:: https://image.ibb.co/ekaugG/spotifylib_authorization_flow_Page_1_2.png
+   :scale: 70%
+   :align: center
+   :height: 1500px
+   :width: 1200px
+
+
 Features
 --------
 
 * Same features as Spotipy's library but with transparent authentication
 * Renew's the token transparently
+
