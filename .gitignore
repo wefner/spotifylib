@@ -55,3 +55,8 @@ env*
 
 
 ### MANAGED STOP ###
+.spotifylib
+_build
+post*
+pre*
+spotifylib/test*

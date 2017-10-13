@@ -15,20 +15,25 @@ __date__ = '''18-09-2017'''
 
 class SpotifyError(Exception):
     """
-    # Wrong client_id
-    (<Response [400]>, 'INVALID_CLIENT: Invalid client')
+    Generic error handler while interacting with Spotify API
 
-    # Wrong response_type
-    (<Response [400]>, 'response_type must be code or token')
+    These errors appear when trying to get access grants and we get a ``400`` Error
 
-    # Invalid scope
-    (<Response [400]>, 'INVALID_SCOPE: Invalid scope')
+    Examples:
+    ---------
+        - Wrong client_id
+        ``'INVALID_CLIENT: Invalid client'``
 
-    # Invalid CSRF cookie
-    (<Response [400]>, '{"error":"errorCSRF"}')
+        - Wrong response_type
+        ``'response_type must be code or token'``
 
-    # Invalid redirect_uri
-    (<Response [400]>, 'Illegal redirect_uri')
-    "Error while accepting APP to Spotify API"
+        - Invalid scope
+        ``'INVALID_SCOPE: Invalid scope'``
+
+        - Invalid CSRF cookie
+        ``'{"error":"errorCSRF"}'``
+
+        - Invalid redirect_uri
+        ``'Illegal redirect_uri'``
     """
     pass
