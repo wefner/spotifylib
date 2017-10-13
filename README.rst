@@ -18,10 +18,10 @@ or `Read the docs <http://spotifylib.readthedocs.io/en/latest/>`_
 or check the code for substantial docstrings.
 
 
-How does the library works
---------------------------
+How does the library work
+-------------------------
 
-.. image:: https://image.ibb.co/iZtfMG/spotifylib_authorization_flow_Page_1_1.png
+.. image:: https://image.ibb.co/ekaugG/spotifylib_authorization_flow_Page_1_2.png
    :scale: 70%
    :align: center
    :height: 1500px

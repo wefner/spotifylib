@@ -315,7 +315,10 @@ class SpotifyAuthenticator(object):
             raise SpotifyError("Couldn't get new token from refresh token. "
                                "Got: {}".format(response.content))
         tokens = response.json()
-        if not tokens.get('refresh_token', {}):
+        # When requesting a new token from a refresh token, we do not get a
+        # new refresh token back so this will update the response with the
+        # already known refresh token so that Token namedtuple can be populated.
+        if not tokens.get('refresh_token'):
             tokens.update({'refresh_token': session.token.refresh_token})
         token_values = [tokens.get(key) for key in Token._fields]
         if not all(token_values):
